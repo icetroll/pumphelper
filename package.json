@@ -39,6 +39,7 @@
     "typescript": "^5.8.3"
   },
   "dependencies": {
+    "@solana/web3.js": "^1.95.3",
     "better-sqlite3": "^12.2.0",
     "body-parser": "^2.2.0",
     "express": "^5.1.0",

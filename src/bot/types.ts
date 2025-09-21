@@ -5,7 +5,12 @@ export type BotConfig = {
 	token?: string
 	sendIntervalMs?: number
 	blacklist?: string[]
+	wildcardBlacklist?: string[]
 	cooldownSeconds?: number
+	restrictedMode?: boolean
+	botWalletAddress?: string
+	solanaRpcUrl?: string
+	tatumApiKey?: string
 }
 
 export type BotStatus = {

@@ -1,0 +1,72 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Pump Chat - Gambling Stream</title>
+  <style>
+    :root { --bg:#0b1020; --card:#0f152a; --border:#1f2a44; --text:#e7ecf3; --muted:#a6b0c3; --accent:#7aa2ff }
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial; margin:0; background:var(--bg); color:var(--text) }
+    header { display:flex; align-items:center; justify-content:space-between; padding:12px 16px; border-bottom:1px solid var(--border) }
+    h1 { margin:0; font-size:18px }
+    .status { font-size:12px; padding:2px 8px; border-radius:999px; border:1px solid var(--border); color:var(--muted) }
+    .status.ok { color:#16a34a; border-color:rgba(22,163,74,0.35); background:rgba(22,163,74,0.07) }
+    .status.warn { color:#d97706; border-color:rgba(217,119,6,0.35); background:rgba(217,119,6,0.07) }
+    .list { padding:14px 16px; display:flex; flex-direction:column; gap:10px }
+    .item { border:1px solid var(--border); border-radius:12px; padding:10px 12px; background:rgba(255,255,255,0.02) }
+    .meta { font-size:12px; color:var(--muted); margin-bottom:4px }
+    .body { white-space:pre-wrap; word-break:break-word }
+  </style>
+  <script>
+    let es
+    function fmtTime(ts){ try { return new Date(ts).toLocaleTimeString() } catch { return '' } }
+    function fmtSol(x){ try { return Number(x).toFixed(4) } catch { return String(x) } }
+    function attach(){
+      const list = document.getElementById('events')
+      const statusEl = document.getElementById('status')
+      if (es) es.close()
+      es = new EventSource('/api/gambling-stream')
+      es.onopen = () => { if (statusEl) { statusEl.textContent = 'Live'; statusEl.className = 'status ok' } }
+      es.onmessage = (ev) => {
+        try {
+          const e = JSON.parse(ev.data)
+          const item = document.createElement('div')
+          item.className = 'item'
+          let text = ''
+          if (e.type === 'deposit-info') {
+            text = `${e.username || e.userAddress || 'User'} requested deposit address: ${e.address}`
+          } else if (e.type === 'balance') {
+            text = `${e.username || e.userAddress || 'User'} balance: ${fmtSol(e.balanceSol)} SOL`
+          } else if (e.type === 'bet') {
+            text = `${e.username || e.userAddress || 'User'} ${e.won ? 'won' : 'lost'} ${fmtSol(e.amountSol)} SOL → balance ${fmtSol(e.newBalanceSol)} SOL`
+          }
+          item.innerHTML = `<div class="meta">${fmtTime(e.timestamp)} • ${e.type}</div><div class="body">${text}</div>`
+          list.appendChild(item)
+          list.scrollTop = list.scrollHeight
+        } catch {}
+      }
+      es.onerror = () => {
+        if (statusEl) { statusEl.textContent = 'Reconnecting…'; statusEl.className = 'status warn' }
+        setTimeout(() => attach(), 2000)
+      }
+    }
+    window.addEventListener('load', attach)
+  </script>
+</head>
+<body>
+  <header>
+    <h1>Gambling Events</h1>
+    <div style="display: flex; gap: 12px; align-items: center;">
+      <div style="display: flex; gap: 8px;">
+        <a href="/" style="color: var(--muted); text-decoration: none; font-size: 14px;">Dashboard</a>
+        <a href="/chat" style="color: var(--muted); text-decoration: none; font-size: 14px;">Live Chat</a>
+        <a href="/restricted" style="color: var(--muted); text-decoration: none; font-size: 14px;">Restricted Mode</a>
+      </div>
+      <div id="status" class="status">Connecting…</div>
+    </div>
+  </header>
+  <section id="events" class="list"></section>
+</body>
+</html>
+
+

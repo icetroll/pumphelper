@@ -30,7 +30,16 @@
       document.getElementById('sendIntervalMs').value = cfg.sendIntervalMs ?? 60000
       document.getElementById('blacklist').value = (cfg.blacklist || []).join(', ')
       document.getElementById('cooldownSeconds').value = cfg.cooldownSeconds ?? 5
+      const rmEl = document.getElementById('restrictedMode')
+      if (rmEl) rmEl.checked = !!cfg.restrictedMode
+      const addrEl = document.getElementById('botWalletAddress')
+      if (addrEl) addrEl.value = cfg.botWalletAddress || ''
+      const rpcEl = document.getElementById('solanaRpcUrl')
+      if (rpcEl) rpcEl.value = cfg.solanaRpcUrl || ''
+      const tatumEl = document.getElementById('tatumApiKey')
+      if (tatumEl) tatumEl.value = cfg.tatumApiKey || ''
       await refreshStatus()
+      await loadBlockedCount()
     }
     async function save() {
       const payload = {
@@ -41,9 +50,33 @@
         sendIntervalMs: Number(document.getElementById('sendIntervalMs').value) || 60000,
         blacklist: document.getElementById('blacklist').value.split(',').map(s => s.trim()).filter(Boolean),
         cooldownSeconds: Number(document.getElementById('cooldownSeconds').value) || 5,
+        restrictedMode: document.getElementById('restrictedMode').checked,
+        botWalletAddress: document.getElementById('botWalletAddress').value.trim() || null,
+        solanaRpcUrl: document.getElementById('solanaRpcUrl').value.trim() || null,
+        tatumApiKey: document.getElementById('tatumApiKey').value.trim() || null,
       }
-      const cfg = await fetchJSON('/api/config', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
-      alert('Saved!')
+      // Check if room ID is changing
+      const currentRoomId = document.getElementById('roomId').value.trim()
+      const statusEl = document.getElementById('status')
+      const originalContent = statusEl ? statusEl.textContent : ''
+      
+      if (currentRoomId && statusEl && statusEl.textContent.includes('"roomId"')) {
+        // Show switching message if room is changing
+        statusEl.textContent = 'Switching rooms...'
+      }
+      
+      try {
+        const cfg = await fetchJSON('/api/config', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+        await refreshStatus()
+        await loadBlockedCount()
+        alert('Saved!')
+      } catch (error) {
+        if (statusEl) {
+          statusEl.textContent = originalContent
+        }
+        alert('Error saving configuration: ' + error.message)
+        throw error
+      }
       return cfg
     }
     async function startBot() {
@@ -57,20 +90,58 @@
     async function refreshStatus() {
       const s = await fetchJSON('/api/bot/status')
       document.getElementById('status').textContent = JSON.stringify(s, null, 2)
+      
+      // Update restricted mode status
+      const restrictedModeEl = document.getElementById('restrictedModeStatus')
+      if (restrictedModeEl) {
+        if (s.restrictedMode) {
+          restrictedModeEl.textContent = 'Enabled'
+          restrictedModeEl.style.color = '#ef4444'
+        } else {
+          restrictedModeEl.textContent = 'Disabled'
+          restrictedModeEl.style.color = '#10b981'
+        }
+      }
     }
+
+    async function loadBlockedCount() {
+      try {
+        const res = await fetchJSON('/api/blocked-messages')
+        const blockedCountEl = document.getElementById('blockedCount')
+        if (blockedCountEl) {
+          blockedCountEl.textContent = res.stats.total || 0
+        }
+      } catch (err) {
+        const blockedCountEl = document.getElementById('blockedCount')
+        if (blockedCountEl) {
+          blockedCountEl.textContent = 'Error'
+        }
+      }
+    }
+
     window.addEventListener('load', load)
   </script>
   </head>
 <body>
   <header>
     <h1>Pump Chat Bot Dashboard</h1>
-    <div>
-      <button onclick="startBot()">Start</button>
-      <button class="secondary" onclick="stopBot()">Stop</button>
+    <div style="display: flex; gap: 12px; align-items: center;">
+      <div style="display: flex; gap: 8px;">
+        <a href="/chat" style="color: #6b7280; text-decoration: none; font-size: 14px;">Live Chat</a>
+        <a href="/gambling" style="color: #6b7280; text-decoration: none; font-size: 14px;">Gambling</a>
+        <a href="/restricted" style="color: #6b7280; text-decoration: none; font-size: 14px;">Restricted Mode</a>
+      </div>
+      <div>
+        <button onclick="startBot()">Start</button>
+        <button class="secondary" onclick="stopBot()">Stop</button>
+      </div>
     </div>
   </header>
   <section class="card">
     <h2>Configuration</h2>
+    <div style="background: #f0f9ff; border: 1px solid #0ea5e9; border-radius: 6px; padding: 12px; margin-bottom: 16px; color: #0c4a6e;">
+      <strong>💡 Tip:</strong> You can now change the Room ID directly without restarting the app. The bot will automatically switch to the new room when you save.
+    </div>
     <div class="row">
       <div>
         <label>Room ID</label>
@@ -101,9 +172,26 @@
         <input id="token" type="password"/>
       </div>
     </div>
+    <div class="row">
+      <div>
+        <label>Bot Wallet Address (SOL)</label>
+        <input id="botWalletAddress" placeholder="e.g. Your bot's public key"/>
+      </div>
+      <div>
+        <label>Solana RPC URL</label>
+        <input id="solanaRpcUrl" placeholder="https://api.mainnet-beta.solana.com"/>
+      </div>
+    </div>
+    <div>
+      <label>Tatum API Key</label>
+      <input id="tatumApiKey" type="password" placeholder="t-..."/>
+    </div>
     <div>
       <label>Blacklist (comma-separated)</label>
       <textarea id="blacklist" rows="3" placeholder="word1, word2"></textarea>
+    </div>
+    <div>
+      <label><input id="restrictedMode" type="checkbox" /> Restricted mode (delete all messages)</label>
     </div>
     <div style="margin-top:12px">
       <button onclick="save()">Save</button>
@@ -114,6 +202,7 @@
     <pre id="status" class="status">{}</pre>
     <div><button class="secondary" onclick="refreshStatus()">Refresh</button></div>
   </section>
+
 </body>
 </html>
 

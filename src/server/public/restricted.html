@@ -1,0 +1,658 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Pump Chat - Restricted Mode Dashboard</title>
+  <style>
+    :root {
+      --bg: #0b1020;
+      --card-bg: #0f152a;
+      --card-border: #1f2a44;
+      --text: #e7ecf3;
+      --muted: #a6b0c3;
+      --accent: #7aa2ff;
+      --danger: #ef4444;
+      --warning: #f59e0b;
+      --success: #10b981;
+      --shadow: 0 6px 24px rgba(0, 0, 0, 0.35);
+    }
+    @media (prefers-color-scheme: light) {
+      :root {
+        --bg: #f6f8fb;
+        --card-bg: #ffffff;
+        --card-border: #e7eaf0;
+        --text: #0c1222;
+        --muted: #5b6780;
+        --accent: #335dff;
+        --danger: #dc2626;
+        --warning: #d97706;
+        --success: #059669;
+        --shadow: 0 6px 20px rgba(10, 20, 60, 0.06);
+      }
+    }
+
+    html, body { height: 100%; }
+    body {
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial;
+      margin: 0;
+      padding: 0;
+      background: var(--bg);
+      color: var(--text);
+      display: flex;
+      flex-direction: column;
+      min-height: 100dvh;
+    }
+
+    header { 
+      display: flex; 
+      align-items: center; 
+      justify-content: space-between; 
+      gap: 12px; 
+      padding: 12px 16px; 
+      border-bottom: 1px solid var(--card-border); 
+    }
+    header h1 { font-size: 20px; margin: 0; letter-spacing: 0.2px; }
+    .nav-links { display: flex; gap: 12px; }
+    .nav-links a { 
+      color: var(--muted); 
+      text-decoration: none; 
+      font-size: 14px; 
+      padding: 4px 8px;
+      border-radius: 4px;
+      transition: all 0.2s;
+    }
+    .nav-links a:hover { color: var(--accent); background: rgba(122, 162, 255, 0.1); }
+
+    .card {
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 16px;
+      background: var(--card-bg);
+      box-shadow: var(--shadow);
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02));
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 16px;
+      text-align: center;
+    }
+
+    .stat-number {
+      font-size: 32px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      font-size: 14px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .stat-total { color: var(--danger); }
+    .stat-restricted { color: var(--warning); }
+    .stat-blacklist { color: var(--accent); }
+    .stat-cooldown { color: var(--success); }
+    .stat-flip { color: var(--muted); }
+
+    .recent-section h3 {
+      margin: 0 0 16px 0;
+      font-size: 18px;
+      color: var(--text);
+    }
+
+    .message-list {
+      max-height: 400px;
+      overflow-y: auto;
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      background: rgba(255,255,255,0.02);
+    }
+
+    .message-item {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--card-border);
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 12px;
+    }
+
+    .message-item:last-child {
+      border-bottom: none;
+    }
+
+    .message-content {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .message-meta {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 4px;
+    }
+
+    .username {
+      font-weight: 600;
+      color: var(--accent);
+    }
+
+    .timestamp {
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .message-text {
+      font-size: 14px;
+      color: var(--text);
+      word-break: break-word;
+      white-space: pre-wrap;
+    }
+
+    .reason-badge {
+      padding: 4px 8px;
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      white-space: nowrap;
+    }
+
+    .reason-restricted_mode { background: rgba(245, 158, 11, 0.2); color: var(--warning); }
+    .reason-blacklist { background: rgba(59, 130, 246, 0.2); color: var(--accent); }
+    .reason-cooldown { background: rgba(16, 185, 129, 0.2); color: var(--success); }
+    .reason-flip_command_lost { background: rgba(107, 114, 128, 0.2); color: var(--muted); }
+
+    .loading {
+      text-align: center;
+      padding: 40px;
+      color: var(--muted);
+    }
+
+    .error {
+      text-align: center;
+      padding: 40px;
+      color: var(--danger);
+    }
+
+    .refresh-btn {
+      background: var(--accent);
+      color: white;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+      margin-bottom: 16px;
+    }
+
+    .refresh-btn:hover {
+      background: #6b8cff;
+    }
+
+    .clear-btn {
+      background: var(--danger);
+      color: white;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+
+    .clear-btn:hover {
+      background: #dc2626;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 40px;
+      color: var(--muted);
+    }
+
+    .empty-state h4 {
+      margin: 0 0 8px 0;
+      color: var(--text);
+    }
+
+    .status {
+      font-size: 12px;
+      padding: 4px 8px;
+      border-radius: 12px;
+      border: 1px solid var(--card-border);
+      color: var(--muted);
+      background: rgba(255,255,255,0.02);
+    }
+
+    .status.connected {
+      color: var(--success);
+      border-color: rgba(16, 185, 129, 0.35);
+      background: rgba(16, 185, 129, 0.07);
+    }
+
+    .status.connecting {
+      color: var(--warning);
+      border-color: rgba(245, 158, 11, 0.35);
+      background: rgba(245, 158, 11, 0.07);
+    }
+
+    .status.error {
+      color: var(--danger);
+      border-color: rgba(239, 68, 68, 0.35);
+      background: rgba(239, 68, 68, 0.07);
+    }
+
+    .tabs {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 20px;
+      border-bottom: 1px solid var(--card-border);
+    }
+
+    .tab-button {
+      background: transparent;
+      border: none;
+      padding: 12px 20px;
+      color: var(--muted);
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      transition: all 0.2s;
+      font-size: 14px;
+      font-weight: 500;
+    }
+
+    .tab-button:hover {
+      color: var(--text);
+      background: rgba(255,255,255,0.02);
+    }
+
+    .tab-button.active {
+      color: var(--accent);
+      border-bottom-color: var(--accent);
+      background: rgba(122, 162, 255, 0.05);
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Restricted Mode Dashboard</h1>
+    <div style="display: flex; gap: 12px; align-items: center;">
+      <div class="nav-links">
+        <a href="/">Dashboard</a>
+        <a href="/chat">Live Chat</a>
+        <a href="/gambling">Gambling</a>
+      </div>
+      <div id="connectionStatus" class="status">Connecting…</div>
+    </div>
+  </header>
+
+  <div class="card">
+    <div style="display: flex; gap: 12px; margin-bottom: 16px;">
+      <button class="refresh-btn" onclick="loadInitialData()">Refresh Data</button>
+      <button class="clear-btn" onclick="clearAllData()">Clear All Data</button>
+    </div>
+    
+    <div class="stats-grid" id="statsGrid">
+      <div class="stat-card">
+        <div class="stat-number stat-total" id="totalCount">-</div>
+        <div class="stat-label">Total Blocked</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-number stat-restricted" id="restrictedCount">-</div>
+        <div class="stat-label">Restricted Mode</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-number stat-blacklist" id="blacklistCount">-</div>
+        <div class="stat-label">Blacklist</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-number stat-cooldown" id="cooldownCount">-</div>
+        <div class="stat-label">Cooldown</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-number stat-flip" id="flipCount">-</div>
+        <div class="stat-label">Flip Command</div>
+      </div>
+    </div>
+
+    <div class="tabs">
+      <button class="tab-button active" onclick="switchTab('blocked')">Blocked Messages</button>
+      <button class="tab-button" onclick="switchTab('chat')">Live Chat</button>
+    </div>
+
+    <div class="recent-section" id="blockedSection">
+      <h3>Recent Blocked Messages</h3>
+      <div class="message-list" id="messageList">
+        <div class="loading">Loading blocked messages...</div>
+      </div>
+    </div>
+
+    <div class="recent-section" id="chatSection" style="display: none;">
+      <h3>Live Chat Messages</h3>
+      <div class="message-list" id="chatList">
+        <div class="loading">Connecting to live chat...</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let blockedMessagesStream = null
+    let chatStream = null
+    let currentStats = { total: 0, restricted_mode: 0, blacklist: 0, cooldown: 0, flip_command_lost: 0 }
+    let recentMessages = []
+    let chatMessages = []
+
+    function formatTime(timestamp) {
+      try {
+        return new Date(timestamp).toLocaleString()
+      } catch {
+        return 'Unknown'
+      }
+    }
+
+    function getReasonClass(reason) {
+      return `reason-${reason}`
+    }
+
+    function getReasonLabel(reason) {
+      const labels = {
+        'restricted_mode': 'Restricted',
+        'blacklist': 'Blacklist',
+        'cooldown': 'Cooldown',
+        'flip_command_lost': 'Flip Lost'
+      }
+      return labels[reason] || reason
+    }
+
+    function truncateMessage(message, maxLength = 100) {
+      if (!message) return 'No message content'
+      if (message.length <= maxLength) return message
+      return message.substring(0, maxLength) + '...'
+    }
+
+    function updateStats(stats) {
+      currentStats = { ...stats }
+      document.getElementById('totalCount').textContent = stats.total || 0
+      document.getElementById('restrictedCount').textContent = stats.restricted_mode || 0
+      document.getElementById('blacklistCount').textContent = stats.blacklist || 0
+      document.getElementById('cooldownCount').textContent = stats.cooldown || 0
+      document.getElementById('flipCount').textContent = stats.flip_command_lost || 0
+    }
+
+    function addNewBlockedMessage(message) {
+      // Add to beginning of recent messages
+      recentMessages.unshift(message)
+      
+      // Keep only last 50 messages
+      if (recentMessages.length > 50) {
+        recentMessages = recentMessages.slice(0, 50)
+      }
+
+      // Update stats
+      const newStats = { ...currentStats }
+      newStats.total = (newStats.total || 0) + 1
+      newStats[message.reason] = (newStats[message.reason] || 0) + 1
+      updateStats(newStats)
+
+      // Update message list
+      updateMessageList(recentMessages)
+    }
+
+    function updateMessageList(messages) {
+      const list = document.getElementById('messageList')
+      
+      if (!messages || messages.length === 0) {
+        list.innerHTML = `
+          <div class="empty-state">
+            <h4>No blocked messages</h4>
+            <p>Messages will appear here when they are blocked by the bot.</p>
+          </div>
+        `
+        return
+      }
+
+      list.innerHTML = messages.map(msg => `
+        <div class="message-item">
+          <div class="message-content">
+            <div class="message-meta">
+              <span class="username">${msg.username || 'Unknown User'}</span>
+              <span class="timestamp">${formatTime(msg.timestamp)}</span>
+            </div>
+            <div class="message-text">${truncateMessage(msg.message)}</div>
+          </div>
+          <div class="reason-badge ${getReasonClass(msg.reason)}">
+            ${getReasonLabel(msg.reason)}
+          </div>
+        </div>
+      `).join('')
+    }
+
+    function updateConnectionStatus(status, text) {
+      const statusEl = document.getElementById('connectionStatus')
+      if (statusEl) {
+        statusEl.className = `status ${status}`
+        statusEl.textContent = text
+      }
+    }
+
+    function switchTab(tab) {
+      // Update tab buttons
+      document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'))
+      document.querySelector(`[onclick="switchTab('${tab}')"]`).classList.add('active')
+      
+      // Show/hide sections
+      document.getElementById('blockedSection').style.display = tab === 'blocked' ? 'block' : 'none'
+      document.getElementById('chatSection').style.display = tab === 'chat' ? 'block' : 'none'
+      
+      // Connect to chat stream if switching to chat tab and not already connected
+      if (tab === 'chat' && !chatStream) {
+        connectChatStream()
+      }
+    }
+
+    function connectBlockedMessagesStream() {
+      if (blockedMessagesStream) {
+        blockedMessagesStream.close()
+      }
+
+      updateConnectionStatus('connecting', 'Connecting…')
+      blockedMessagesStream = new EventSource('/api/blocked-messages-stream')
+      
+      blockedMessagesStream.onopen = () => {
+        console.log('Connected to blocked messages stream')
+        updateConnectionStatus('connected', 'Live')
+      }
+
+      blockedMessagesStream.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data)
+          if (data.type === 'blocked-message') {
+            addNewBlockedMessage(data)
+          }
+        } catch (error) {
+          console.error('Error parsing blocked message event:', error)
+        }
+      }
+
+      blockedMessagesStream.onerror = (error) => {
+        console.error('Blocked messages stream error:', error)
+        updateConnectionStatus('error', 'Reconnecting…')
+        // Reconnect after 3 seconds
+        setTimeout(() => {
+          connectBlockedMessagesStream()
+        }, 3000)
+      }
+    }
+
+    function connectChatStream() {
+      if (chatStream) {
+        chatStream.close()
+      }
+
+      chatStream = new EventSource('/api/stream')
+      
+      chatStream.onopen = () => {
+        console.log('Connected to chat stream')
+        updateChatList(chatMessages)
+      }
+
+      chatStream.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data)
+          addNewChatMessage(data)
+        } catch (error) {
+          console.error('Error parsing chat message event:', error)
+        }
+      }
+
+      chatStream.onerror = (error) => {
+        console.error('Chat stream error:', error)
+        // Reconnect after 3 seconds
+        setTimeout(() => {
+          connectChatStream()
+        }, 3000)
+      }
+    }
+
+    function addNewChatMessage(message) {
+      // Add to beginning of chat messages
+      chatMessages.unshift(message)
+      
+      // Keep only last 50 messages
+      if (chatMessages.length > 50) {
+        chatMessages = chatMessages.slice(0, 50)
+      }
+
+      // Update chat list
+      updateChatList(chatMessages)
+    }
+
+    function updateChatList(messages) {
+      const list = document.getElementById('chatList')
+      
+      if (!messages || messages.length === 0) {
+        list.innerHTML = `
+          <div class="empty-state">
+            <h4>No chat messages</h4>
+            <p>Chat messages will appear here when users send them.</p>
+          </div>
+        `
+        return
+      }
+
+      list.innerHTML = messages.map(msg => `
+        <div class="message-item">
+          <div class="message-content">
+            <div class="message-meta">
+              <span class="username">${msg.username || 'Unknown User'}</span>
+              <span class="timestamp">${formatTime(msg.timestamp)}</span>
+            </div>
+            <div class="message-text">${msg.message || 'No message content'}</div>
+          </div>
+        </div>
+      `).join('')
+    }
+
+    async function loadInitialData() {
+      try {
+        const response = await fetch('/api/blocked-messages')
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`)
+        }
+        
+        const data = await response.json()
+        updateStats(data.stats)
+        recentMessages = data.recent || []
+        updateMessageList(recentMessages)
+      } catch (error) {
+        console.error('Failed to load initial blocked messages:', error)
+        document.getElementById('messageList').innerHTML = `
+          <div class="error">
+            <h4>Failed to load data</h4>
+            <p>Error: ${error.message}</p>
+          </div>
+        `
+      }
+    }
+
+    async function clearAllData() {
+      // Show confirmation dialog
+      const confirmed = confirm(
+        'Are you sure you want to clear all blocked message data?\n\n' +
+        'This will:\n' +
+        '• Clear all blocked message statistics\n' +
+        '• Remove all blocked message history\n' +
+        '• Reset the blocked message counter\n\n' +
+        'This action cannot be undone.'
+      )
+      
+      if (!confirmed) {
+        return
+      }
+      
+      try {
+        const response = await fetch('/api/blocked-messages/clear', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        })
+        
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`)
+        }
+        
+        const result = await response.json()
+        
+        // Reset local data
+        currentStats = { total: 0, restricted_mode: 0, blacklist: 0, cooldown: 0, flip_command_lost: 0 }
+        recentMessages = []
+        chatMessages = []
+        
+        // Update UI
+        updateStats(currentStats)
+        updateMessageList(recentMessages)
+        updateChatList(chatMessages)
+        
+        // Show success message
+        alert(`✅ ${result.message}\n\nCleared ${result.deletedCount} blocked messages.`)
+        
+      } catch (error) {
+        console.error('Failed to clear data:', error)
+        alert(`❌ Failed to clear data: ${error.message}`)
+      }
+    }
+
+    // Load initial data and connect to stream on page load
+    window.addEventListener('load', () => {
+      loadInitialData()
+      connectBlockedMessagesStream()
+    })
+
+    // Clean up on page unload
+    window.addEventListener('beforeunload', () => {
+      if (blockedMessagesStream) {
+        blockedMessagesStream.close()
+      }
+      if (chatStream) {
+        chatStream.close()
+      }
+    })
+  </script>
+</body>
+</html>

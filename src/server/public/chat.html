@@ -126,7 +126,14 @@
 <body>
   <header>
     <h1>Live Chat</h1>
-    <div id="status" class="status">Connecting…</div>
+    <div style="display: flex; gap: 12px; align-items: center;">
+      <div style="display: flex; gap: 8px;">
+        <a href="/" style="color: var(--muted); text-decoration: none; font-size: 14px;">Dashboard</a>
+        <a href="/gambling" style="color: var(--muted); text-decoration: none; font-size: 14px;">Gambling</a>
+        <a href="/restricted" style="color: var(--muted); text-decoration: none; font-size: 14px;">Restricted Mode</a>
+      </div>
+      <div id="status" class="status">Connecting…</div>
+    </div>
   </header>
   <section class="card" id="messages"></section>
 </body>

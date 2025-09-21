@@ -120,6 +120,9 @@ export class PumpChatClient extends EventEmitter {
   /** Maximum number of times to attempt reconnection before giving up */
   private maxReconnectAttempts: number = Infinity
   
+  /** Flag to prevent reconnection when explicitly disconnected */
+  private isExplicitlyDisconnected: boolean = false
+  
   /** 
    * Current acknowledgment ID for socket.io protocol.
    * Cycles from 0-9 to match request/response pairs.
@@ -299,6 +302,7 @@ export class PumpChatClient extends EventEmitter {
       // Numbered acknowledgments (430-439) correspond to requests (420-429)
       case "430": // Response to 420 (usually joinRoom)
       case "431": // Response to 421 (usually getMessageHistory)
+        this.handleMessageHistoryAck(data)
       case "432": // Response to 422
       case "433": // Response to 423
       case "434": // Response to 424
@@ -367,7 +371,9 @@ export class PumpChatClient extends EventEmitter {
     
     // Send joinRoom request with acknowledgment ID
     // Format: 42X["joinRoom",{...}] where X is the ack ID
-    this.send(`42${joinAckId}["joinRoom",{"roomId":"${this.roomId}","username":"${this.username}"}]`)
+    const joinMessage = `42${joinAckId}["joinRoom",{"roomId":"${this.roomId}","username":"${this.username}"}]`
+    console.log(`🔗 Attempting to join room: ${this.roomId} with username: ${this.username}`)
+    this.send(joinMessage)
     
     // Note: Message history request will be sent after successful join
   }
@@ -445,6 +451,18 @@ export class PumpChatClient extends EventEmitter {
     }
   }
 
+
+
+  private handleMessageHistoryAck(data: string) {
+    try {
+      const ackData = JSON.parse(data.substring(2))
+      this.messageHistory = this.sortMessagesChronologically(ackData).slice(-this.messageHistoryLimit)
+      this.emit("messageHistory", this.messageHistory)
+    } catch (error) {
+      console.error("Error parsing message history acknowledgment:", error)
+    }
+  }
+
   /**
    * Handles numbered acknowledgment messages (430-439).
    * These correspond to our numbered requests (420-429).
@@ -475,6 +493,7 @@ export class PumpChatClient extends EventEmitter {
       // Handle response based on the original request type
       if (pendingAck?.event === "joinRoom") {
         // Successfully joined the room, now request message history
+        console.log(`✅ Successfully joined room: ${this.roomId}`)
         this.requestMessageHistory()
       } else if (pendingAck?.event === "getMessageHistory") {
         // Received message history - support multiple response shapes
@@ -554,6 +573,7 @@ export class PumpChatClient extends EventEmitter {
     
     // Send request with acknowledgment ID
     // Format: 42X["getMessageHistory",{...}] where X is the ack ID
+    console.log(`📜 Requesting message history for room: ${this.roomId}`)
     this.send(`42${historyAckId}["getMessageHistory",{"roomId":"${this.roomId}","before":null,"limit":${this.messageHistoryLimit}}]`)
   }
 
@@ -641,6 +661,12 @@ export class PumpChatClient extends EventEmitter {
    * @private
    */
   private attemptReconnect() {
+    // Don't reconnect if explicitly disconnected
+    if (this.isExplicitlyDisconnected) {
+      console.log("Skipping reconnection - explicitly disconnected")
+      return
+    }
+    
     // Check if we've exceeded max attempts
     if (this.reconnectAttempts < this.maxReconnectAttempts) {
       this.reconnectAttempts++
@@ -653,7 +679,10 @@ export class PumpChatClient extends EventEmitter {
       
       // Schedule reconnection attempt
       setTimeout(() => {
-        this.connect()
+        // Check again before reconnecting in case disconnect was called during delay
+        if (!this.isExplicitlyDisconnected) {
+          this.connect()
+        }
       }, delay)
     } else {
       // Max attempts reached, notify consumers
@@ -672,6 +701,9 @@ export class PumpChatClient extends EventEmitter {
    * ```
    */
   public connect() {
+    // Reset the explicit disconnect flag when connecting
+    this.isExplicitlyDisconnected = false
+    
     // Headers required for successful WebSocket connection to pump.fun
     const headers: { [key: string]: string } = {
       // Standard WebSocket headers
@@ -718,13 +750,26 @@ export class PumpChatClient extends EventEmitter {
    * ```
    */
   public disconnect() {
+    // Set flag to prevent reconnection
+    this.isExplicitlyDisconnected = true
+    
     // Stop sending ping messages
     this.stopPing()
+    
+    // Stop acknowledgment cleanup
+    this.stopAckCleanup()
+    
+    // Clear pending acknowledgments
+    this.pendingAcks.clear()
     
     // Close the WebSocket connection if active
     if (this.connection) {
       this.connection.close()
     }
+    
+    // Reset connection state
+    this.isConnected = false
+    this.connection = null
   }
 
   /**
